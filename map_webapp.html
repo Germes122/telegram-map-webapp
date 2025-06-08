@@ -21,21 +21,38 @@
             padding: 10px;
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            width: 300px;
         }
         #addressInputFrom, #addressInputTo {
             width: 100%;
-            margin-bottom: 10px;
-            padding: 10px;
+            margin-bottom: 5px;
+            padding: 8px;
             box-sizing: border-box;
+        }
+        .suggestions {
+            margin-top: 5px;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .suggestion-item {
+            padding: 5px;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background-color: #e0e0e0;
         }
         #sendButton {
             margin-top: 10px;
-            padding: 10px;
+            padding: 8px;
             background-color: #4CAF50;
             color: white;
             border: none;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -45,15 +62,17 @@
             cursor: not-allowed;
         }
         #sendButton img {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
         }
     </style>
 </head>
 <body>
 <div id="controls">
-    <input type="text" id="addressInputFrom" placeholder="Введите адрес погрузки">
-    <input type="text" id="addressInputTo" placeholder="Введите адрес отгрузки">
+    <input type="text" id="addressInputFrom" placeholder="Адрес погрузки">
+    <div id="suggestionsFrom" class="suggestions"></div>
+    <input type="text" id="addressInputTo" placeholder="Адрес отгрузки">
+    <div id="suggestionsTo" class="suggestions"></div>
     <button id="sendButton" disabled>
         <img src="https://cdn4.iconfinder.com/data/icons/communication-538/24/send-1024.png" alt="Отправить">
     </button>
@@ -71,72 +90,53 @@
             controls: ['zoomControl']
         });
 
-        const points = []; // Массив точек
-        let route; // Ссылка на текущий маршрут
+        const points = [];
+        let route;
 
-        // Обработка ввода адреса погрузки
-        document.getElementById("addressInputFrom").addEventListener("keydown", function (e) {
-            if (e.key === "Enter") {
+        function handleInput(inputId, suggestionsId, index) {
+            const inputElement = document.getElementById(inputId);
+            const suggestionsElement = document.getElementById(suggestionsId);
+
+            inputElement.addEventListener("input", function (e) {
                 const query = e.target.value;
+                if (query.length < 3) {
+                    suggestionsElement.innerHTML = "";
+                    return;
+                }
+
                 ymaps.geocode(query).then(function (res) {
-                    const firstGeoObject = res.geoObjects.get(0);
-                    if (firstGeoObject) {
-                        const coords = firstGeoObject.geometry.getCoordinates();
-                        const placemark = new ymaps.Placemark(coords, {
-                            balloonContent: `Погрузка: ${firstGeoObject.getAddressLine()}`
-                        }, {
-                            preset: 'islands#redIcon'
+                    suggestionsElement.innerHTML = "";
+                    res.geoObjects.each(function (geoObject) {
+                        const option = document.createElement("div");
+                        option.textContent = geoObject.getAddressLine();
+                        option.className = "suggestion-item";
+                        option.addEventListener("click", function () {
+                            const coords = geoObject.geometry.getCoordinates();
+                            points[index] = coords;
+                            const placemark = new ymaps.Placemark(coords, {
+                                balloonContent: geoObject.getAddressLine()
+                            }, {
+                                preset: index === 0 ? 'islands#redIcon' : 'islands#blueIcon'
+                            });
+                            map.geoObjects.add(placemark);
+                            suggestionsElement.innerHTML = "";
+                            checkRoute();
                         });
-
-                        map.geoObjects.add(placemark);
-                        points[0] = coords;
-
-                        // Сохраняем точки в localStorage
-                        localStorage.setItem('mapPoints', JSON.stringify(points));
-                        checkRoute();
-                    } else {
-                        alert("Адрес погрузки не найден.");
-                    }
+                        suggestionsElement.appendChild(option);
+                    });
                 });
-            }
-        });
+            });
+        }
 
-        // Обработка ввода адреса отгрузки
-        document.getElementById("addressInputTo").addEventListener("keydown", function (e) {
-            if (e.key === "Enter") {
-                const query = e.target.value;
-                ymaps.geocode(query).then(function (res) {
-                    const firstGeoObject = res.geoObjects.get(0);
-                    if (firstGeoObject) {
-                        const coords = firstGeoObject.geometry.getCoordinates();
-                        const placemark = new ymaps.Placemark(coords, {
-                            balloonContent: `Отгрузка: ${firstGeoObject.getAddressLine()}`
-                        }, {
-                            preset: 'islands#blueIcon'
-                        });
+        handleInput("addressInputFrom", "suggestionsFrom", 0);
+        handleInput("addressInputTo", "suggestionsTo", 1);
 
-                        map.geoObjects.add(placemark);
-                        points[1] = coords;
-
-                        // Сохраняем точки в localStorage
-                        localStorage.setItem('mapPoints', JSON.stringify(points));
-                        checkRoute();
-                    } else {
-                        alert("Адрес отгрузки не найден.");
-                    }
-                });
-            }
-        });
-
-        // Проверка и построение маршрута
         function checkRoute() {
             if (points.length === 2 && points[0] && points[1]) {
                 if (route) {
                     map.geoObjects.remove(route);
                 }
-                ymaps.route(points, {
-                    mapStateAutoApply: true
-                }).then(function (r) {
+                ymaps.route(points, { mapStateAutoApply: true }).then(function (r) {
                     route = r;
                     map.geoObjects.add(route);
                     document.getElementById("sendButton").disabled = false;
@@ -146,30 +146,14 @@
             }
         }
 
-        // Отправка данных в Telegram бот
         document.getElementById("sendButton").addEventListener("click", function () {
             if (points.length === 2 && points[0] && points[1]) {
                 const data = { from: points[0], to: points[1] };
                 Telegram.WebApp.sendData(JSON.stringify(data));
             } else {
-                alert("Добавьте оба адреса: погрузки и отгрузки.");
+                alert("Добавьте оба адреса.");
             }
         });
-
-        // Восстановление точек из localStorage
-        const savedPoints = JSON.parse(localStorage.getItem('mapPoints') || '[]');
-        if (savedPoints.length === 2) {
-            savedPoints.forEach((coords, index) => {
-                const placemark = new ymaps.Placemark(coords, {
-                    balloonContent: index === 0 ? "Погрузка" : "Отгрузка"
-                }, {
-                    preset: index === 0 ? 'islands#redIcon' : 'islands#blueIcon'
-                });
-                map.geoObjects.add(placemark);
-                points[index] = coords;
-            });
-            checkRoute();
-        }
     }
 </script>
 </body>
