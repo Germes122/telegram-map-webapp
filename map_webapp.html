@@ -39,11 +39,6 @@
 </head>
 <body>
 <div id="controls">
-    <select id="mapType">
-        <option value="map">Схема</option>
-        <option value="satellite">Спутник</option>
-        <option value="hybrid">Гибрид</option>
-    </select>
     <button id="sendButton" disabled>Отправить данные</button>
 </div>
 <div id="map"></div>
@@ -61,11 +56,6 @@
 
         const points = []; // Массив точек
         let route; // Ссылка на текущий маршрут
-
-        // Изменение типа карты
-        document.getElementById("mapType").addEventListener("change", function () {
-            map.setType(this.value);
-        });
 
         // Получаем текущую позицию пользователя
         ymaps.geolocation.get().then(function (res) {
