@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Карта с Photon и Leaflet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link 
+        rel="stylesheet" 
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC0="
+        crossorigin=""
+    />
+    <style>
+        html, body { height: 100%; margin: 0; }
+        #map { height: 90%; }
+        #searchBox {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <input type="text" id="searchBox" placeholder="Введите адрес...">
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-o9N1j7k1yE+3Wuj1yU9yoF6r7bXw13X8mJf5p3rV0uU="
+        crossorigin=""></script>
+    <script>
+        const map = L.map('map').setView([55.751244, 37.618423], 10); // Москва по умолчанию
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        const markerGroup = L.layerGroup().addTo(map);
+
+        document.getElementById("searchBox").addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                const query = e.target.value;
+                fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=ru`)
+                    .then(res => res.json())
+                    .then(data => {
+                        markerGroup.clearLayers();
+                        if (data.features.length > 0) {
+                            const feature = data.features[0];
+                            const [lon, lat] = feature.geometry.coordinates;
+                            const marker = L.marker([lat, lon]).addTo(markerGroup);
+                            map.setView([lat, lon], 15);
+                            marker.bindPopup(feature.properties.name || query).openPopup();
+                        } else {
+                            alert("Ничего не найдено");
+                        }
+                    });
+            }
+        });
+    </script>
+</body>
+</html>
