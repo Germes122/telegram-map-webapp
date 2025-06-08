@@ -45,7 +45,7 @@
         .suggestion-item:hover {
             background-color: #e0e0e0;
         }
-        #sendButton {
+        #sendButton, #toggleThemeButton {
             margin-top: 10px;
             padding: 8px;
             background-color: #4CAF50;
@@ -61,9 +61,12 @@
             background-color: #ccc;
             cursor: not-allowed;
         }
-        #sendButton img {
+        #sendButton img, #toggleThemeButton img {
             width: 16px;
             height: 16px;
+        }
+        .dark-mode {
+            filter: grayscale(100%);
         }
     </style>
 </head>
@@ -75,6 +78,9 @@
     <div id="suggestionsTo" class="suggestions"></div>
     <button id="sendButton" disabled>
         <img src="https://cdn4.iconfinder.com/data/icons/communication-538/24/send-1024.png" alt="Отправить">
+    </button>
+    <button id="toggleThemeButton">
+        <img src="https://cdn-icons-png.flaticon.com/512/61/61456.png" alt="Переключить тему">
     </button>
 </div>
 <div id="map"></div>
@@ -113,6 +119,7 @@
                         option.addEventListener("click", function () {
                             const coords = geoObject.geometry.getCoordinates();
                             points[index] = coords;
+                            inputElement.value = geoObject.getAddressLine(); // Заполнение поля ввода
                             const placemark = new ymaps.Placemark(coords, {
                                 balloonContent: geoObject.getAddressLine()
                             }, {
@@ -153,6 +160,18 @@
             } else {
                 alert("Добавьте оба адреса.");
             }
+        });
+
+        // Переключение темы
+        const toggleThemeButton = document.getElementById("toggleThemeButton");
+        let isDarkMode = false;
+
+        toggleThemeButton.addEventListener("click", function () {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle("dark-mode", isDarkMode);
+            toggleThemeButton.querySelector("img").src = isDarkMode
+                ? "https://cdn-icons-png.flaticon.com/512/61/61457.png" // Значок для светлого режима
+                : "https://cdn-icons-png.flaticon.com/512/61/61456.png"; // Значок для темного режима
         });
     }
 </script>
