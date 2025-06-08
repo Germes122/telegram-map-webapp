@@ -1,27 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>MapTiler</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    html, body { height: 100%; margin: 0; }
-    #map { width: 100%; height: 100vh; }
-  </style>
+    <meta charset="utf-8">
+    <title>Карта</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=43aa7db3-27ee-4ce1-927b-0cb976ded812&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        html, body, #map {
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
 </head>
 <body>
-  <div id="map"></div>
+<div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    const map = L.map('map').setView([55.751244, 37.618423], 10); // Москва
+<script>
+    ymaps.ready(init);
 
-    L.tileLayer('https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=AOfGnmNCGlxHfSqwIj8b', {
-      tileSize: 512,
-      zoomOffset: -1,
-      attribution: '&copy; <a href="https://www.maptiler.com">MapTiler</a> &copy; OpenStreetMap contributors'
-    }).addTo(map);
-  </script>
+    function init() {
+        const map = new ymaps.Map("map", {
+            center: [55.76, 37.64], // Москва
+            zoom: 10,
+            controls: ['searchControl', 'zoomControl']
+        });
+
+        const searchControl = map.controls.get('searchControl');
+        searchControl.options.set('size', 'large');
+
+        let route; // Ссылка на текущий маршрут
+
+        // Получаем текущую позицию пользователя
+        ymaps.geolocation.get().then(function (res) {
+            const userCoords = res.geoObjects.position;
+
+            // Отображаем текущую позицию
+            const userPlacemark = new ymaps.Placemark(userCoords, {
+                balloonContent: 'Вы здесь'
+            }, {
+                preset: 'islands#blueDotIcon'
+            });
+
+            map.geoObjects.add(userPlacemark);
+            map.setCenter(userCoords);
+
+            // Обработка клика по карте — выбор точки и построение маршрута
+            map.events.add('click', function (e) {
+                const destCoords = e.get('coords');
+
+                // Удаляем старый маршрут
+                if (route) {
+                    map.geoObjects.remove(route);
+                }
+
+                // Строим новый маршрут
+                ymaps.route([userCoords, destCoords], {
+                    mapStateAutoApply: true
+                }).then(function (r) {
+                    route = r;
+                    map.geoObjects.add(route);
+                }, function (error) {
+                    alert("Ошибка построения маршрута: " + error.message);
+                });
+            });
+        });
+    }
+</script>
 </body>
 </html>
