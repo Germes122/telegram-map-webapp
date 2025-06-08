@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta charset="utf-8">
-    <title>Карта</title>
+    <meta charset="UTF-8">
+    <title>Карта с Yandex Maps</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://api-maps.yandex.ru/2.1/?apikey=43aa7db3-27ee-4ce1-927b-0cb976ded812&lang=ru_RU" type="text/javascript"></script>
     <style>
         html, body, #map {
@@ -11,11 +12,43 @@
             margin: 0;
             padding: 0;
         }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        #sendButton {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #sendButton:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
+<div id="controls">
+    <select id="mapType">
+        <option value="map">Схема</option>
+        <option value="satellite">Спутник</option>
+        <option value="hybrid">Гибрид</option>
+    </select>
+    <button id="sendButton" disabled>Отправить данные</button>
+</div>
 <div id="map"></div>
 
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
     ymaps.ready(init);
 
@@ -23,13 +56,16 @@
         const map = new ymaps.Map("map", {
             center: [55.76, 37.64], // Москва
             zoom: 10,
-            controls: ['searchControl', 'zoomControl']
+            controls: ['zoomControl']
         });
 
-        const searchControl = map.controls.get('searchControl');
-        searchControl.options.set('size', 'large');
-
+        const points = []; // Массив точек
         let route; // Ссылка на текущий маршрут
+
+        // Изменение типа карты
+        document.getElementById("mapType").addEventListener("change", function () {
+            map.setType(this.value);
+        });
 
         // Получаем текущую позицию пользователя
         ymaps.geolocation.get().then(function (res) {
@@ -45,26 +81,73 @@
             map.geoObjects.add(userPlacemark);
             map.setCenter(userCoords);
 
-            // Обработка клика по карте — выбор точки и построение маршрута
+            // Обработка клика по карте — добавление точки
             map.events.add('click', function (e) {
-                const destCoords = e.get('coords');
-
-                // Удаляем старый маршрут
-                if (route) {
-                    map.geoObjects.remove(route);
-                }
-
-                // Строим новый маршрут
-                ymaps.route([userCoords, destCoords], {
-                    mapStateAutoApply: true
-                }).then(function (r) {
-                    route = r;
-                    map.geoObjects.add(route);
-                }, function (error) {
-                    alert("Ошибка построения маршрута: " + error.message);
+                const coords = e.get('coords');
+                const placemark = new ymaps.Placemark(coords, {
+                    balloonContent: `Точка ${points.length + 1}`
+                }, {
+                    preset: 'islands#redIcon'
                 });
+
+                map.geoObjects.add(placemark);
+                points.push(coords);
+
+                // Сохраняем точки в localStorage
+                localStorage.setItem('mapPoints', JSON.stringify(points));
+
+                // Строим маршрут, если есть хотя бы 2 точки
+                if (points.length > 1) {
+                    if (route) {
+                        map.geoObjects.remove(route);
+                    }
+                    ymaps.route(points, {
+                        mapStateAutoApply: true
+                    }).then(function (r) {
+                        route = r;
+                        map.geoObjects.add(route);
+                        document.getElementById("sendButton").disabled = false;
+                    }, function (error) {
+                        alert("Ошибка построения маршрута: " + error.message);
+                    });
+                }
             });
         });
+
+        // Отправка данных в Telegram бот
+        document.getElementById("sendButton").addEventListener("click", function () {
+            if (points.length > 1) {
+                const data = { points };
+                Telegram.WebApp.sendData(JSON.stringify(data));
+            } else {
+                alert("Добавьте хотя бы две точки.");
+            }
+        });
+
+        // Восстановление точек из localStorage
+        const savedPoints = JSON.parse(localStorage.getItem('mapPoints') || '[]');
+        savedPoints.forEach(coords => {
+            const placemark = new ymaps.Placemark(coords, {
+                balloonContent: `Точка ${points.length + 1}`
+            }, {
+                preset: 'islands#redIcon'
+            });
+            map.geoObjects.add(placemark);
+            points.push(coords);
+        });
+
+        // Если есть сохранённые точки, строим маршрут
+        if (points.length > 1) {
+            ymaps.route(points, {
+                mapStateAutoApply: true
+            }).then(function (r) {
+                route = r;
+                map.geoObjects.add(route);
+                document.getElementById("sendButton").disabled = false;
+            }, function (error) {
+                alert("Ошибка построения маршрута: " + error.message);
+            });
+        }
     }
 </script>
 </body>
