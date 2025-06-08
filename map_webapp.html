@@ -45,7 +45,7 @@
         .suggestion-item:hover {
             background-color: #e0e0e0;
         }
-        #sendButton {
+        #sendButton, #resetButton, #myLocationButton {
             margin-top: 10px;
             padding: 8px;
             background-color: #4CAF50;
@@ -57,6 +57,12 @@
             align-items: center;
             justify-content: center;
         }
+        #resetButton {
+            background: #f44336;
+        }
+        #myLocationButton {
+            background: #2196F3;
+        }
         #sendButton:disabled {
             background-color: #ccc;
             cursor: not-allowed;
@@ -65,8 +71,32 @@
             width: 16px;
             height: 16px;
         }
-        .dark-mode {
-            filter: grayscale(100%);
+        #infoBlock {
+            margin-top: 10px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 13px;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+        #historyBlock {
+            margin-top: 10px;
+            background: #fffbe6;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 13px;
+            color: #333;
+            border: 1px solid #ffe58f;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+        .history-item {
+            cursor: pointer;
+            padding: 3px 0;
+        }
+        .history-item:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -76,9 +106,13 @@
     <div id="suggestionsFrom" class="suggestions"></div>
     <input type="text" id="addressInputTo" placeholder="Адрес отгрузки">
     <div id="suggestionsTo" class="suggestions"></div>
+    <button id="myLocationButton">Моё местоположение</button>
     <button id="sendButton" disabled>
         <img src="https://cdn4.iconfinder.com/data/icons/communication-538/24/send-1024.png" alt="Отправить">
     </button>
+    <button id="resetButton">Сбросить точки</button>
+    <div id="infoBlock"></div>
+    <div id="historyBlock"></div>
 </div>
 <div id="map"></div>
 
@@ -88,14 +122,46 @@
 
     function init() {
         const map = new ymaps.Map("map", {
-            center: [55.76, 37.64], // Москва
+            center: [55.76, 37.64],
             zoom: 10,
             controls: ['zoomControl']
         });
 
         const points = [];
-        const placemarks = []; // Хранение маркеров
+        const placemarks = [];
         let route;
+        let routeInfo = null;
+        const historyKey = "addressHistory";
+        let addressHistory = JSON.parse(localStorage.getItem(historyKey) || "[]");
+
+        function saveHistory(address) {
+            if (!addressHistory.includes(address)) {
+                addressHistory.unshift(address);
+                if (addressHistory.length > 10) addressHistory.pop();
+                localStorage.setItem(historyKey, JSON.stringify(addressHistory));
+                renderHistory();
+            }
+        }
+
+        function renderHistory() {
+            const block = document.getElementById("historyBlock");
+            block.innerHTML = "<b>История поиска:</b>";
+            addressHistory.forEach(addr => {
+                const div = document.createElement("div");
+                div.textContent = addr;
+                div.className = "history-item";
+                div.onclick = function() {
+                    if (document.activeElement === document.getElementById("addressInputFrom")) {
+                        document.getElementById("addressInputFrom").value = addr;
+                        document.getElementById("addressInputFrom").dispatchEvent(new Event("input"));
+                    } else {
+                        document.getElementById("addressInputTo").value = addr;
+                        document.getElementById("addressInputTo").dispatchEvent(new Event("input"));
+                    }
+                };
+                block.appendChild(div);
+            });
+        }
 
         function handleInput(inputId, suggestionsId, index) {
             const inputElement = document.getElementById(inputId);
@@ -123,29 +189,43 @@
                                 map.geoObjects.remove(placemarks[index]);
                             }
 
-                            // Добавление нового маркера с кастомным стилем
+                            // Добавление нового маркера с кастомным стилем и фоном под текстом
                             const placemark = new ymaps.Placemark(coords, {
-                                balloonContent: geoObject.getAddressLine()
+                                balloonContent: geoObject.getAddressLine(),
+                                iconContent: geoObject.getAddressLine()
                             }, {
                                 iconLayout: 'default#imageWithContent',
-                                iconImageHref: index === 0 
-                                    ? 'https://cdn-icons-png.flaticon.com/512/684/684908.png' // Стиль для точки погрузки
-                                    : 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Стиль для точки отгрузки (тот же значок)
+                                iconImageHref: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
                                 iconImageSize: [30, 42],
                                 iconImageOffset: [-15, -42],
+                                iconContentOffset: [0, -50],
                                 iconContentLayout: ymaps.templateLayoutFactory.createClass(
-                                    `<div style="color: black; font-size: 12px; font-weight: bold; text-align: center;">
-                                        {{ properties.balloonContent }}
+                                    `<div style="
+                                        background: #ffc0cb;
+                                        color: #222;
+                                        font-size: 13px;
+                                        font-weight: bold;
+                                        text-align: center;
+                                        border-radius: 10px;
+                                        padding: 8px 12px;
+                                        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+                                        max-width: 180px;
+                                        white-space: pre-line;
+                                        line-height: 1.2;
+                                        border: 1px solid #eeb6c2;
+                                    ">
+                                        $[properties.iconContent]
                                     </div>`
                                 )
                             });
                             map.geoObjects.add(placemark);
                             placemarks[index] = placemark;
 
-                            inputElement.value = geoObject.getAddressLine(); // Заполнение поля ввода
+                            inputElement.value = geoObject.getAddressLine();
                             suggestionsElement.innerHTML = "";
 
-                            // Перемещение карты к точке
+                            saveHistory(geoObject.getAddressLine());
+
                             map.setCenter(coords, 15);
 
                             checkRoute();
@@ -160,6 +240,8 @@
         handleInput("addressInputTo", "suggestionsTo", 1);
 
         function checkRoute() {
+            const infoBlock = document.getElementById("infoBlock");
+            infoBlock.innerHTML = "";
             if (points.length === 2 && points[0] && points[1]) {
                 if (route) {
                     map.geoObjects.remove(route);
@@ -171,6 +253,11 @@
                     // Увеличение карты на общий маршрут
                     const bounds = route.getBounds();
                     map.setBounds(bounds, { checkZoomRange: true });
+
+                    // Получение информации о маршруте
+                    const distance = (route.getLength() / 1000).toFixed(2);
+                    const duration = Math.round(route.getTime() / 60);
+                    infoBlock.innerHTML = `<b>Расстояние:</b> ${distance} км<br><b>Время в пути:</b> ${duration} мин`;
 
                     document.getElementById("sendButton").disabled = false;
                 }, function (error) {
@@ -187,6 +274,74 @@
                 alert("Добавьте оба адреса.");
             }
         });
+
+        document.getElementById("resetButton").addEventListener("click", function () {
+            // Удалить все маркеры и маршрут
+            placemarks.forEach(pm => pm && map.geoObjects.remove(pm));
+            placemarks.length = 0;
+            points.length = 0;
+            if (route) {
+                map.geoObjects.remove(route);
+                route = null;
+            }
+            document.getElementById("sendButton").disabled = true;
+            document.getElementById("addressInputFrom").value = "";
+            document.getElementById("addressInputTo").value = "";
+            document.getElementById("infoBlock").innerHTML = "";
+        });
+
+        // Кнопка "Моё местоположение"
+        document.getElementById("myLocationButton").addEventListener("click", function () {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function (pos) {
+                    const coords = [pos.coords.latitude, pos.coords.longitude];
+                    map.setView ? map.setView(coords, 15) : map.setCenter(coords, 15);
+                    // Для быстрой установки точки погрузки
+                    document.getElementById("addressInputFrom").value = `${coords[0]}, ${coords[1]}`;
+                    points[0] = coords;
+                    // Удалить предыдущий маркер
+                    if (placemarks[0]) map.geoObjects.remove(placemarks[0]);
+                    // Добавить маркер
+                    const placemark = new ymaps.Placemark(coords, {
+                        balloonContent: "Моё местоположение",
+                        iconContent: "Моё местоположение"
+                    }, {
+                        iconLayout: 'default#imageWithContent',
+                        iconImageHref: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                        iconImageSize: [30, 42],
+                        iconImageOffset: [-15, -42],
+                        iconContentOffset: [0, -50],
+                        iconContentLayout: ymaps.templateLayoutFactory.createClass(
+                            `<div style="
+                                background: #ffc0cb;
+                                color: #222;
+                                font-size: 13px;
+                                font-weight: bold;
+                                text-align: center;
+                                border-radius: 10px;
+                                padding: 8px 12px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+                                max-width: 180px;
+                                white-space: pre-line;
+                                line-height: 1.2;
+                                border: 1px solid #eeb6c2;
+                            ">
+                                $[properties.iconContent]
+                            </div>`
+                        )
+                    });
+                    map.geoObjects.add(placemark);
+                    placemarks[0] = placemark;
+                    checkRoute();
+                }, function () {
+                    alert("Не удалось получить геолокацию.");
+                });
+            } else {
+                alert("Геолокация не поддерживается вашим браузером.");
+            }
+        });
+
+        renderHistory();
     }
 </script>
 </body>
