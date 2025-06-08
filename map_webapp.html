@@ -22,7 +22,7 @@
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
-        #addressInput {
+        #addressInputFrom, #addressInputTo {
             width: 100%;
             margin-bottom: 10px;
             padding: 10px;
@@ -36,17 +36,27 @@
             border: none;
             cursor: pointer;
             font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         #sendButton:disabled {
             background-color: #ccc;
             cursor: not-allowed;
         }
+        #sendButton img {
+            width: 20px;
+            height: 20px;
+        }
     </style>
 </head>
 <body>
 <div id="controls">
-    <input type="text" id="addressInput" placeholder="Введите адрес и нажмите Enter">
-    <button id="sendButton" disabled>Отправить данные</button>
+    <input type="text" id="addressInputFrom" placeholder="Введите адрес погрузки и нажмите Enter">
+    <input type="text" id="addressInputTo" placeholder="Введите адрес отгрузки и нажмите Enter">
+    <button id="sendButton" disabled>
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Telegram_logo.svg/2048px-Telegram_logo.svg.png" alt="Отправить">
+    </button>
 </div>
 <div id="map"></div>
 
@@ -64,8 +74,8 @@
         const points = []; // Массив точек
         let route; // Ссылка на текущий маршрут
 
-        // Обработка ввода адреса
-        document.getElementById("addressInput").addEventListener("keydown", function (e) {
+        // Обработка ввода адреса погрузки
+        document.getElementById("addressInputFrom").addEventListener("keydown", function (e) {
             if (e.key === "Enter") {
                 const query = e.target.value;
                 ymaps.geocode(query).then(function (res) {
@@ -73,56 +83,54 @@
                     if (firstGeoObject) {
                         const coords = firstGeoObject.geometry.getCoordinates();
                         const placemark = new ymaps.Placemark(coords, {
-                            balloonContent: firstGeoObject.getAddressLine()
+                            balloonContent: `Погрузка: ${firstGeoObject.getAddressLine()}`
                         }, {
                             preset: 'islands#redIcon'
                         });
 
                         map.geoObjects.add(placemark);
-                        points.push(coords);
+                        points[0] = coords;
 
                         // Сохраняем точки в localStorage
                         localStorage.setItem('mapPoints', JSON.stringify(points));
-
-                        // Строим маршрут, если есть хотя бы 2 точки
-                        if (points.length > 1) {
-                            if (route) {
-                                map.geoObjects.remove(route);
-                            }
-                            ymaps.route(points, {
-                                mapStateAutoApply: true
-                            }).then(function (r) {
-                                route = r;
-                                map.geoObjects.add(route);
-                                document.getElementById("sendButton").disabled = false;
-                            }, function (error) {
-                                alert("Ошибка построения маршрута: " + error.message);
-                            });
-                        }
+                        checkRoute();
                     } else {
-                        alert("Адрес не найден.");
+                        alert("Адрес погрузки не найден.");
                     }
                 });
             }
         });
 
-        // Обработка клика по карте — добавление точки
-        map.events.add('click', function (e) {
-            const coords = e.get('coords');
-            const placemark = new ymaps.Placemark(coords, {
-                balloonContent: `Точка ${points.length + 1}`
-            }, {
-                preset: 'islands#redIcon'
-            });
+        // Обработка ввода адреса отгрузки
+        document.getElementById("addressInputTo").addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                const query = e.target.value;
+                ymaps.geocode(query).then(function (res) {
+                    const firstGeoObject = res.geoObjects.get(0);
+                    if (firstGeoObject) {
+                        const coords = firstGeoObject.geometry.getCoordinates();
+                        const placemark = new ymaps.Placemark(coords, {
+                            balloonContent: `Отгрузка: ${firstGeoObject.getAddressLine()}`
+                        }, {
+                            preset: 'islands#blueIcon'
+                        });
 
-            map.geoObjects.add(placemark);
-            points.push(coords);
+                        map.geoObjects.add(placemark);
+                        points[1] = coords;
 
-            // Сохраняем точки в localStorage
-            localStorage.setItem('mapPoints', JSON.stringify(points));
+                        // Сохраняем точки в localStorage
+                        localStorage.setItem('mapPoints', JSON.stringify(points));
+                        checkRoute();
+                    } else {
+                        alert("Адрес отгрузки не найден.");
+                    }
+                });
+            }
+        });
 
-            // Строим маршрут, если есть хотя бы 2 точки
-            if (points.length > 1) {
+        // Проверка и построение маршрута
+        function checkRoute() {
+            if (points.length === 2 && points[0] && points[1]) {
                 if (route) {
                     map.geoObjects.remove(route);
                 }
@@ -136,41 +144,31 @@
                     alert("Ошибка построения маршрута: " + error.message);
                 });
             }
-        });
+        }
 
         // Отправка данных в Telegram бот
         document.getElementById("sendButton").addEventListener("click", function () {
-            if (points.length > 1) {
-                const data = { points };
+            if (points.length === 2 && points[0] && points[1]) {
+                const data = { from: points[0], to: points[1] };
                 Telegram.WebApp.sendData(JSON.stringify(data));
             } else {
-                alert("Добавьте хотя бы две точки.");
+                alert("Добавьте оба адреса: погрузки и отгрузки.");
             }
         });
 
         // Восстановление точек из localStorage
         const savedPoints = JSON.parse(localStorage.getItem('mapPoints') || '[]');
-        savedPoints.forEach(coords => {
-            const placemark = new ymaps.Placemark(coords, {
-                balloonContent: `Точка ${points.length + 1}`
-            }, {
-                preset: 'islands#redIcon'
+        if (savedPoints.length === 2) {
+            savedPoints.forEach((coords, index) => {
+                const placemark = new ymaps.Placemark(coords, {
+                    balloonContent: index === 0 ? "Погрузка" : "Отгрузка"
+                }, {
+                    preset: index === 0 ? 'islands#redIcon' : 'islands#blueIcon'
+                });
+                map.geoObjects.add(placemark);
+                points[index] = coords;
             });
-            map.geoObjects.add(placemark);
-            points.push(coords);
-        });
-
-        // Если есть сохранённые точки, строим маршрут
-        if (points.length > 1) {
-            ymaps.route(points, {
-                mapStateAutoApply: true
-            }).then(function (r) {
-                route = r;
-                map.geoObjects.add(route);
-                document.getElementById("sendButton").disabled = false;
-            }, function (error) {
-                alert("Ошибка построения маршрута: " + error.message);
-            });
+            checkRoute();
         }
     }
 </script>
