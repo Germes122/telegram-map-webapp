@@ -22,6 +22,12 @@
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
+        #addressInput {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
         #sendButton {
             margin-top: 10px;
             padding: 10px;
@@ -39,6 +45,7 @@
 </head>
 <body>
 <div id="controls">
+    <input type="text" id="addressInput" placeholder="Введите адрес и нажмите Enter">
     <button id="sendButton" disabled>Отправить данные</button>
 </div>
 <div id="map"></div>
@@ -57,51 +64,78 @@
         const points = []; // Массив точек
         let route; // Ссылка на текущий маршрут
 
-        // Получаем текущую позицию пользователя
-        ymaps.geolocation.get().then(function (res) {
-            const userCoords = res.geoObjects.position;
+        // Обработка ввода адреса
+        document.getElementById("addressInput").addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                const query = e.target.value;
+                ymaps.geocode(query).then(function (res) {
+                    const firstGeoObject = res.geoObjects.get(0);
+                    if (firstGeoObject) {
+                        const coords = firstGeoObject.geometry.getCoordinates();
+                        const placemark = new ymaps.Placemark(coords, {
+                            balloonContent: firstGeoObject.getAddressLine()
+                        }, {
+                            preset: 'islands#redIcon'
+                        });
 
-            // Отображаем текущую позицию
-            const userPlacemark = new ymaps.Placemark(userCoords, {
-                balloonContent: 'Вы здесь'
-            }, {
-                preset: 'islands#blueDotIcon'
-            });
+                        map.geoObjects.add(placemark);
+                        points.push(coords);
 
-            map.geoObjects.add(userPlacemark);
-            map.setCenter(userCoords);
+                        // Сохраняем точки в localStorage
+                        localStorage.setItem('mapPoints', JSON.stringify(points));
 
-            // Обработка клика по карте — добавление точки
-            map.events.add('click', function (e) {
-                const coords = e.get('coords');
-                const placemark = new ymaps.Placemark(coords, {
-                    balloonContent: `Точка ${points.length + 1}`
-                }, {
-                    preset: 'islands#redIcon'
-                });
-
-                map.geoObjects.add(placemark);
-                points.push(coords);
-
-                // Сохраняем точки в localStorage
-                localStorage.setItem('mapPoints', JSON.stringify(points));
-
-                // Строим маршрут, если есть хотя бы 2 точки
-                if (points.length > 1) {
-                    if (route) {
-                        map.geoObjects.remove(route);
+                        // Строим маршрут, если есть хотя бы 2 точки
+                        if (points.length > 1) {
+                            if (route) {
+                                map.geoObjects.remove(route);
+                            }
+                            ymaps.route(points, {
+                                mapStateAutoApply: true
+                            }).then(function (r) {
+                                route = r;
+                                map.geoObjects.add(route);
+                                document.getElementById("sendButton").disabled = false;
+                            }, function (error) {
+                                alert("Ошибка построения маршрута: " + error.message);
+                            });
+                        }
+                    } else {
+                        alert("Адрес не найден.");
                     }
-                    ymaps.route(points, {
-                        mapStateAutoApply: true
-                    }).then(function (r) {
-                        route = r;
-                        map.geoObjects.add(route);
-                        document.getElementById("sendButton").disabled = false;
-                    }, function (error) {
-                        alert("Ошибка построения маршрута: " + error.message);
-                    });
-                }
+                });
+            }
+        });
+
+        // Обработка клика по карте — добавление точки
+        map.events.add('click', function (e) {
+            const coords = e.get('coords');
+            const placemark = new ymaps.Placemark(coords, {
+                balloonContent: `Точка ${points.length + 1}`
+            }, {
+                preset: 'islands#redIcon'
             });
+
+            map.geoObjects.add(placemark);
+            points.push(coords);
+
+            // Сохраняем точки в localStorage
+            localStorage.setItem('mapPoints', JSON.stringify(points));
+
+            // Строим маршрут, если есть хотя бы 2 точки
+            if (points.length > 1) {
+                if (route) {
+                    map.geoObjects.remove(route);
+                }
+                ymaps.route(points, {
+                    mapStateAutoApply: true
+                }).then(function (r) {
+                    route = r;
+                    map.geoObjects.add(route);
+                    document.getElementById("sendButton").disabled = false;
+                }, function (error) {
+                    alert("Ошибка построения маршрута: " + error.message);
+                });
+            }
         });
 
         // Отправка данных в Telegram бот
