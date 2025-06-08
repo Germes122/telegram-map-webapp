@@ -45,7 +45,7 @@
         .suggestion-item:hover {
             background-color: #e0e0e0;
         }
-        #sendButton, #toggleThemeButton {
+        #sendButton {
             margin-top: 10px;
             padding: 8px;
             background-color: #4CAF50;
@@ -61,7 +61,7 @@
             background-color: #ccc;
             cursor: not-allowed;
         }
-        #sendButton img, #toggleThemeButton img {
+        #sendButton img {
             width: 16px;
             height: 16px;
         }
@@ -79,9 +79,6 @@
     <button id="sendButton" disabled>
         <img src="https://cdn4.iconfinder.com/data/icons/communication-538/24/send-1024.png" alt="Отправить">
     </button>
-    <button id="toggleThemeButton">
-        <img src="https://cdn-icons-png.flaticon.com/512/61/61456.png" alt="Переключить тему">
-    </button>
 </div>
 <div id="map"></div>
 
@@ -97,6 +94,7 @@
         });
 
         const points = [];
+        const placemarks = []; // Хранение маркеров
         let route;
 
         function handleInput(inputId, suggestionsId, index) {
@@ -119,14 +117,37 @@
                         option.addEventListener("click", function () {
                             const coords = geoObject.geometry.getCoordinates();
                             points[index] = coords;
-                            inputElement.value = geoObject.getAddressLine(); // Заполнение поля ввода
+
+                            // Удаление предыдущего маркера
+                            if (placemarks[index]) {
+                                map.geoObjects.remove(placemarks[index]);
+                            }
+
+                            // Добавление нового маркера с кастомным стилем
                             const placemark = new ymaps.Placemark(coords, {
                                 balloonContent: geoObject.getAddressLine()
                             }, {
-                                preset: index === 0 ? 'islands#redIcon' : 'islands#blueIcon'
+                                iconLayout: 'default#imageWithContent',
+                                iconImageHref: index === 0 
+                                    ? 'https://cdn-icons-png.flaticon.com/512/684/684908.png' // Стиль для точки погрузки
+                                    : 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Стиль для точки отгрузки (тот же значок)
+                                iconImageSize: [30, 42],
+                                iconImageOffset: [-15, -42],
+                                iconContentLayout: ymaps.templateLayoutFactory.createClass(
+                                    `<div style="color: black; font-size: 12px; font-weight: bold; text-align: center;">
+                                        {{ properties.balloonContent }}
+                                    </div>`
+                                )
                             });
                             map.geoObjects.add(placemark);
+                            placemarks[index] = placemark;
+
+                            inputElement.value = geoObject.getAddressLine(); // Заполнение поля ввода
                             suggestionsElement.innerHTML = "";
+
+                            // Перемещение карты к точке
+                            map.setCenter(coords, 15);
+
                             checkRoute();
                         });
                         suggestionsElement.appendChild(option);
@@ -146,6 +167,11 @@
                 ymaps.route(points, { mapStateAutoApply: true }).then(function (r) {
                     route = r;
                     map.geoObjects.add(route);
+
+                    // Увеличение карты на общий маршрут
+                    const bounds = route.getBounds();
+                    map.setBounds(bounds, { checkZoomRange: true });
+
                     document.getElementById("sendButton").disabled = false;
                 }, function (error) {
                     alert("Ошибка построения маршрута: " + error.message);
@@ -160,18 +186,6 @@
             } else {
                 alert("Добавьте оба адреса.");
             }
-        });
-
-        // Переключение темы
-        const toggleThemeButton = document.getElementById("toggleThemeButton");
-        let isDarkMode = false;
-
-        toggleThemeButton.addEventListener("click", function () {
-            isDarkMode = !isDarkMode;
-            document.body.classList.toggle("dark-mode", isDarkMode);
-            toggleThemeButton.querySelector("img").src = isDarkMode
-                ? "https://cdn-icons-png.flaticon.com/512/61/61457.png" // Значок для светлого режима
-                : "https://cdn-icons-png.flaticon.com/512/61/61456.png"; // Значок для темного режима
         });
     }
 </script>
