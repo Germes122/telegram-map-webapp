@@ -1,96 +1,69 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Карта с Photon и Leaflet</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link 
-        rel="stylesheet" 
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC0="
-        crossorigin=""
-    />
-    <style>
-        html, body { height: 100%; margin: 0; }
-        #map { height: calc(100% - 50px); } /* Убедитесь, что карта занимает оставшееся пространство */
-        #searchBox {
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        #sendButton {
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        #sendButton:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <title>Карта с Photon и Leaflet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha512-sA+e2u9s0M+ddE3zS+q0ZQFvn1RWuZkPm+Lo+0T5C6DZVZgRQf7U34cNey1Wm3c9K6BdIxtCzF5OyxJ1XMl6Zg=="
+    crossorigin=""
+  />
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { width: 100%; height: 100vh; }
+    #search {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+    }
+  </style>
 </head>
 <body>
-    <input type="text" id="searchBox" placeholder="Введите адрес...">
-    <div id="map"></div>
-    <button id="sendButton" disabled>Отправить данные</button>
+  <div id="search">
+    <input type="text" id="query" placeholder="Введите адрес">
+    <button onclick="search()">Поиск</button>
+  </div>
+  <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-o9N1j7k1yE+3Wuj1yU9yoF6r7bXw13X8mJf5p3rV0uU="
-        crossorigin=""></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script>
-        const map = L.map('map').setView([55.751244, 37.618423], 10); // Москва по умолчанию
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha512-vH8yL20xhtE9kXw6FknSCE7QrmKsj8lVw7l66OmAStFCz4Z3ydPpcVv4l1dFu+T7ke8RZ9YmCV1zY6Ww5nN5sQ=="
+    crossorigin=""
+  ></script>
+  <script>
+    const map = L.map('map').setView([55.751244, 37.618423], 10); // Москва
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-        const markerGroup = L.layerGroup().addTo(map);
-        let startCoords = null;
-        let endCoords = null;
+    let marker;
 
-        document.getElementById("searchBox").addEventListener("keydown", function(e) {
-            if (e.key === "Enter") {
-                const query = e.target.value;
-                fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=ru`)
-                    .then(res => res.json())
-                    .then(data => {
-                        markerGroup.clearLayers();
-                        if (data.features.length > 0) {
-                            const feature = data.features[0];
-                            const [lon, lat] = feature.geometry.coordinates;
-                            const marker = L.marker([lat, lon]).addTo(markerGroup);
-                            map.setView([lat, lon], 15);
-                            marker.bindPopup(feature.properties.name || query).openPopup();
+    async function search() {
+      const query = document.getElementById('query').value;
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
 
-                            if (!startCoords) {
-                                startCoords = [lat, lon];
-                                alert("Точка отправления установлена.");
-                            } else {
-                                endCoords = [lat, lon];
-                                alert("Точка назначения установлена.");
-                                document.getElementById("sendButton").disabled = false;
-                            }
-                        } else {
-                            alert("Ничего не найдено");
-                        }
-                    });
-            }
-        });
+      const res = await fetch(url);
+      const data = await res.json();
 
-        document.getElementById("sendButton").addEventListener("click", function() {
-            if (startCoords && endCoords) {
-                const data = { start: startCoords, end: endCoords };
-                Telegram.WebApp.sendData(JSON.stringify(data));
-            } else {
-                alert("Установите обе точки: отправления и назначения.");
-            }
-        });
-    </script>
+      if (data.features && data.features.length > 0) {
+        const [lon, lat] = data.features[0].geometry.coordinates;
+
+        if (marker) map.removeLayer(marker);
+
+        marker = L.marker([lat, lon]).addTo(map);
+        map.setView([lat, lon], 15);
+      } else {
+        alert('Ничего не найдено');
+      }
+    }
+  </script>
 </body>
 </html>
