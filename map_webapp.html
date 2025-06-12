@@ -596,15 +596,23 @@
 
     // Обработчик для кнопки подтверждения
     confirmBtn.addEventListener('click', function() {
+        console.log('Confirm button clicked');
         const pickupAddress = document.getElementById('pickup').value;
         const deliveryAddress = document.getElementById('delivery').value;
         
         if (pickupAddress && deliveryAddress) {
-            // Отправляем данные в Telegram бота
-            Telegram.WebApp.sendData(JSON.stringify({
-                pickup: pickupAddress,
-                delivery: deliveryAddress
-            }));
+            console.log('Sending data to Telegram');
+            // Проверяем, запущено ли приложение внутри Telegram
+            if (window.Telegram && Telegram.WebApp) {
+                // Отправляем данные в Telegram бота
+                Telegram.WebApp.sendData(JSON.stringify({
+                    pickup: pickupAddress,
+                    delivery: deliveryAddress
+                }));
+            } else {
+                console.log('Telegram.WebApp not found');
+                alert('Откройте приложение через Telegram для корректной работы');
+            }
         } else {
             alert('Пожалуйста, заполните оба адреса');
         }
