@@ -619,6 +619,137 @@
             bottomPanel.classList.remove('collapsed');
         }
     });
+
+    // Добавляю обработчик на кнопку 'Подтвердить' для отправки данных в Telegram WebApp
+    function sendDataToTelegram() {
+        const pickupAddress = document.getElementById('pickup').value;
+        const deliveryAddress = document.getElementById('delivery').value;
+        
+        if (!points[0] || !points[1]) {
+            writeToLogFile({
+                event: 'validation_error',
+                message: 'Не выбраны оба адреса'
+            });
+            alert('Пожалуйста, выберите оба адреса (откуда и куда)');
+            return;
+        }
+
+        const data = {
+            from: pickupAddress,
+            to: deliveryAddress,
+            coordinates: {
+                start: points[0],
+                end: points[1]
+            }
+        };
+        
+        writeToLogFile({
+            event: 'send_data_attempt',
+            ...data
+        });
+        
+        if (window.Telegram?.WebApp) {
+            try {
+                Telegram.WebApp.sendData(JSON.stringify(data));
+                writeToLogFile({
+                    event: 'send_data_success',
+                    ...data
+                });
+                Telegram.WebApp.close();
+            } catch (e) {
+                writeToLogFile({
+                    event: 'send_data_error',
+                    error: e.message,
+                    stack: e.stack,
+                    ...data
+                });
+                alert('Ошибка при отправке данных: ' + e.message);
+            }
+        } else {
+            const msg = 'Откройте приложение через Telegram для корректной работы';
+            writeToLogFile({
+                event: 'telegram_not_found',
+                message: msg,
+                ...data
+            });
+            alert(msg);
+        }
+    }
+    
+    // Добавляем обработчик с проверкой элемента
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmBtn = document.getElementById('confirmBtnBottom');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', sendDataToTelegram);
+            console.log('Confirm button handler added');
+        } else {
+            console.error('Confirm button not found!');
+        }
+    });
+
+    // Функция для сохранения логов в файл
+    function saveLogsToFile(data) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const filename = `webapp-logs-${timestamp}.txt`
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'text/plain'})
+        
+        if (window.Telegram?.WebApp) {
+            // В Telegram WebApp используем их API для скачивания
+            Telegram.WebApp.downloadFile(blob, filename)
+        } else {
+            // В обычном браузере создаем временную ссылку
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+        }
+        
+        return filename
+    }
+
+    // Функция для записи логов в единый файл
+    function writeToLogFile(data) {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            ...data
+        };
+        
+        if (window.Telegram?.WebApp) {
+            Telegram.WebApp.sendData(JSON.stringify({
+                type: 'log_entry',
+                ...logEntry
+            }));
+        } else {
+            // В обычном браузере сохраняем в localStorage
+            const logs = JSON.parse(localStorage.getItem('webapp_logs') || '[]');
+            logs.push(logEntry);
+            localStorage.setItem('webapp_logs', JSON.stringify(logs));
+            
+            // Создаем кнопку для скачивания логов
+            const downloadBtn = document.getElementById('downloadLogsBtn') || 
+                document.createElement('button');
+            downloadBtn.id = 'downloadLogsBtn';
+            downloadBtn.textContent = 'Скачать логи';
+            downloadBtn.style.position = 'fixed';
+            downloadBtn.style.bottom = '20px';
+            downloadBtn.style.right = '20px';
+            downloadBtn.style.zIndex = '1000';
+            downloadBtn.onclick = () => {
+                const blob = new Blob([localStorage.getItem('webapp_logs')], 
+                    {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'webapp_logs.json';
+                a.click();
+            };
+            document.body.appendChild(downloadBtn);
+        }
+    }
 </script>
 </body>
 </html>
