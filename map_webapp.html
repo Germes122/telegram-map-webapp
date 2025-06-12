@@ -603,7 +603,7 @@
         if (pickupAddress && deliveryAddress) {
             console.log('Sending data to Telegram');
             // Проверяем, запущено ли приложение внутри Telegram
-            if (window.Telegram && Telegram.WebApp) {
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
                 // Отправляем данные в Telegram бота
                 Telegram.WebApp.sendData(JSON.stringify({
                     pickup: pickupAddress,
