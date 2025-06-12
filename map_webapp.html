@@ -398,9 +398,8 @@
                 <input type="text" id="delivery" class="address-input" placeholder="Адрес доставки" autocomplete="off">
                 <span class="clear-btn" id="clearDelivery" style="display:none;">×</span>
             </div>
-            <button id="confirmBtnBottom" class="confirm-btn-bottom" disabled>Подтвердить</button>
+            <button id="confirmBtn" class="confirm-btn-bottom">Подтвердить</button>
             <div id="routeInfo" class="route-info" style="display:none;"></div>
-            <button id="confirmBtn" class="confirm-btn" style="display:none;">Показать маршрут</button>
         </div>
     </div>
 <script>
@@ -411,13 +410,12 @@
     let deliveryInput = document.getElementById('delivery');
     let routeInfo = document.getElementById('routeInfo');
     let confirmBtn = document.getElementById('confirmBtn');
-    let confirmBtnBottom = document.getElementById('confirmBtnBottom');
 
     function updateConfirmBtnState() {
         if (points[0] && points[1]) {
-            confirmBtnBottom.disabled = false;
+            confirmBtn.disabled = false;
         } else {
-            confirmBtnBottom.disabled = true;
+            confirmBtn.disabled = true;
         }
     }
 
@@ -588,24 +586,29 @@
                 let dur = route.getDuration();
                 routeInfo.innerHTML = `<b>Расстояние:</b> ${(len/1000).toFixed(1)} км<br><b>Время:</b> ${Math.round(dur/60)} мин`;
                 routeInfo.style.display = 'block';
-                confirmBtn.style.display = 'block';
             });
         } else {
             if (route) { map.geoObjects.remove(route); route = null; }
             routeInfo.style.display = 'none';
-            confirmBtn.style.display = 'none';
         }
         updateConfirmBtnState();
     }
 
-    // Кнопка показать маршрут
-    confirmBtn.onclick = function() {
-        if (route) {
-            let bounds = null;
-            if (typeof route.getBounds === 'function') bounds = route.getBounds();
-            if (bounds) map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 40, duration: 2000 });
+    // Обработчик для кнопки подтверждения
+    confirmBtn.addEventListener('click', function() {
+        const pickupAddress = document.getElementById('pickup').value;
+        const deliveryAddress = document.getElementById('delivery').value;
+        
+        if (pickupAddress && deliveryAddress) {
+            // Отправляем данные в Telegram бота
+            Telegram.WebApp.sendData(JSON.stringify({
+                pickup: pickupAddress,
+                delivery: deliveryAddress
+            }));
+        } else {
+            alert('Пожалуйста, заполните оба адреса');
         }
-    };
+    });
 
     // --- Bottom panel handle logic ---
     const bottomPanel = document.getElementById('bottomPanel');
@@ -617,73 +620,6 @@
             bottomPanel.classList.add('collapsed');
         } else {
             bottomPanel.classList.remove('collapsed');
-        }
-    });
-
-    // Добавляю обработчик на кнопку 'Подтвердить' для отправки данных в Telegram WebApp
-    function sendDataToTelegram() {
-        const pickupAddress = document.getElementById('pickup').value;
-        const deliveryAddress = document.getElementById('delivery').value;
-        
-        if (!points[0] || !points[1]) {
-            writeToLogFile({
-                event: 'validation_error',
-                message: 'Не выбраны оба адреса'
-            });
-            alert('Пожалуйста, выберите оба адреса (откуда и куда)');
-            return;
-        }
-
-        const data = {
-            from: pickupAddress,
-            to: deliveryAddress,
-            coordinates: {
-                start: points[0],
-                end: points[1]
-            }
-        };
-        
-        writeToLogFile({
-            event: 'send_data_attempt',
-            ...data
-        });
-        
-        if (window.Telegram?.WebApp) {
-            try {
-                Telegram.WebApp.sendData(JSON.stringify(data));
-                writeToLogFile({
-                    event: 'send_data_success',
-                    ...data
-                });
-                Telegram.WebApp.close();
-            } catch (e) {
-                writeToLogFile({
-                    event: 'send_data_error',
-                    error: e.message,
-                    stack: e.stack,
-                    ...data
-                });
-                alert('Ошибка при отправке данных: ' + e.message);
-            }
-        } else {
-            const msg = 'Откройте приложение через Telegram для корректной работы';
-            writeToLogFile({
-                event: 'telegram_not_found',
-                message: msg,
-                ...data
-            });
-            alert(msg);
-        }
-    }
-    
-    // Добавляем обработчик с проверкой элемента
-    document.addEventListener('DOMContentLoaded', function() {
-        const confirmBtn = document.getElementById('confirmBtnBottom');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', sendDataToTelegram);
-            console.log('Confirm button handler added');
-        } else {
-            console.error('Confirm button not found!');
         }
     });
 
