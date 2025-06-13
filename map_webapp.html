@@ -596,26 +596,36 @@
 
     // Обработчик для кнопки подтверждения
     confirmBtn.addEventListener('click', function() {
-        console.log('Кнопка подтверждения нажата');
+        console.log('Попытка отправки данных');
+        
+        if (typeof Telegram === 'undefined' || !Telegram.WebApp) {
+            alert('Ошибка: приложение не запущено в Telegram');
+            return;
+        }
+        
         const pickupAddress = document.getElementById('pickup').value;
         const deliveryAddress = document.getElementById('delivery').value;
-        console.log('Адреса:', {pickup: pickupAddress, delivery: deliveryAddress});
-
+        
         if (!pickupAddress || !deliveryAddress) {
             alert('Пожалуйста, укажите оба адреса');
             return;
         }
-
+        
+        const data = {
+            type: 'addresses',
+            pickup: pickupAddress,
+            delivery: deliveryAddress
+        };
+        
+        console.log('Отправляемые данные:', data);
+        
         try {
-            const data = {
-                pickup: pickupAddress,
-                delivery: deliveryAddress
-            };
-            
             Telegram.WebApp.sendData(JSON.stringify(data));
+            console.log('Данные успешно отправлены');
             Telegram.WebApp.close();
         } catch (e) {
-            console.error('Ошибка отправки данных:', e);
+            console.error('Ошибка отправки:', e);
+            sendErrorToBot(e);
             alert('Ошибка отправки данных. Пожалуйста, попробуйте еще раз');
         }
     });
