@@ -419,40 +419,13 @@
         }
     }
 
-    // Улучшенная проверка Telegram WebApp API
-    function isTelegramWebAppReady() {
-        try {
-            return typeof Telegram !== 'undefined' && 
-                   Telegram && 
-                   Telegram.WebApp && 
-                   Telegram.WebApp.initDataUnsafe &&
-                   Telegram.WebApp.sendData;
-        } catch (e) {
-            console.error('Telegram WebApp check failed:', e);
-            return false;
-        }
-    }
-
-    // Инициализация приложения
-    if (!isTelegramWebAppReady()) {
-        document.getElementById('confirmBtn').style.display = 'none';
-        document.getElementById('bottomPanel').innerHTML = `
-            <div style="padding: 20px; text-align: center; color: white">
-                <h3>Для работы требуется Telegram</h3>
-                <p>Пожалуйста, откройте приложение через @YourBotName</p>
-                <p><a href="tg://resolve?domain=YourBotName" style="color: #2196F3">Открыть в Telegram</a></p>
-            </div>
-        `;
-        throw new Error('Telegram WebApp not initialized');
-    }
-
     ymaps.ready(init);
 
     function init() {
         map = new ymaps.Map('map', {
-            center: [45.035470, 38.975313], // Краснодар
+            center: [55.76, 37.64],
             zoom: 10,
-            controls: ['zoomControl']
+            controls: []
         });
 
         // Обработчики для обоих полей
@@ -623,18 +596,6 @@
 
     // Обработчик для кнопки подтверждения
     confirmBtn.addEventListener('click', function() {
-        if (typeof Telegram === 'undefined' || !Telegram.WebApp) {
-            document.getElementById('confirmBtn').style.display = 'none';
-            document.getElementById('bottomPanel').innerHTML = `
-                <div style="padding: 20px; text-align: center; color: white">
-                    <h3>Это приложение работает только внутри Telegram</h3>
-                    <p>Пожалуйста, откройте его через бота @YourBotName</p>
-                    <p>Или <a href="tg://resolve?domain=YourBotName" style="color: #2196F3">нажмите здесь</a> чтобы перейти в бота</p>
-                </div>
-            `;
-            return;
-        }
-
         const pickupAddress = document.getElementById('pickup').value;
         const deliveryAddress = document.getElementById('delivery').value;
 
@@ -649,8 +610,8 @@
                 delivery: deliveryAddress
             };
             
-            Telegram.WebApp.sendData(JSON.stringify(data));
-            Telegram.WebApp.close();
+            // Telegram.WebApp.sendData(JSON.stringify(data));
+            // Telegram.WebApp.close();
         } catch (e) {
             console.error('Ошибка отправки данных:', e);
             alert('Ошибка отправки данных. Пожалуйста, попробуйте еще раз');
