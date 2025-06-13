@@ -596,25 +596,30 @@
 
     // Обработчик для кнопки подтверждения
     confirmBtn.addEventListener('click', function() {
-        console.log('Confirm button clicked');
+        if (typeof Telegram === 'undefined' || !Telegram.WebApp) {
+            alert('Пожалуйста, откройте это приложение через Telegram для корректной работы');
+            return;
+        }
+
         const pickupAddress = document.getElementById('pickup').value;
         const deliveryAddress = document.getElementById('delivery').value;
-        
-        if (pickupAddress && deliveryAddress) {
-            console.log('Sending data to Telegram');
-            // Проверяем, запущено ли приложение внутри Telegram
-            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-                // Отправляем данные в Telegram бота
-                Telegram.WebApp.sendData(JSON.stringify({
-                    pickup: pickupAddress,
-                    delivery: deliveryAddress
-                }));
-            } else {
-                console.log('Telegram.WebApp not found');
-                alert('Откройте приложение через Telegram для корректной работы');
-            }
-        } else {
-            alert('Пожалуйста, заполните оба адреса');
+
+        if (!pickupAddress || !deliveryAddress) {
+            alert('Пожалуйста, укажите оба адреса');
+            return;
+        }
+
+        try {
+            const data = {
+                pickup: pickupAddress,
+                delivery: deliveryAddress
+            };
+            
+            Telegram.WebApp.sendData(JSON.stringify(data));
+            Telegram.WebApp.close();
+        } catch (e) {
+            console.error('Ошибка отправки данных:', e);
+            alert('Ошибка отправки данных. Пожалуйста, попробуйте еще раз');
         }
     });
 
