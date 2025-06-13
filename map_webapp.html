@@ -596,8 +596,10 @@
 
     // Обработчик для кнопки подтверждения
     confirmBtn.addEventListener('click', function() {
+        console.log('Кнопка подтверждения нажата');
         const pickupAddress = document.getElementById('pickup').value;
         const deliveryAddress = document.getElementById('delivery').value;
+        console.log('Адреса:', {pickup: pickupAddress, delivery: deliveryAddress});
 
         if (!pickupAddress || !deliveryAddress) {
             alert('Пожалуйста, укажите оба адреса');
@@ -687,6 +689,24 @@
         };
         document.body.appendChild(downloadBtn);
     }
+
+    function sendErrorToBot(error) {
+        try {
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                Telegram.WebApp.sendData(JSON.stringify({
+                    type: 'error',
+                    message: error.toString(),
+                    stack: error.stack
+                }));
+            }
+        } catch (e) {
+            console.error('Не удалось отправить ошибку:', e);
+        }
+    }
+
+    window.onerror = function(message, source, lineno, colno, error) {
+        sendErrorToBot(error || message);
+    };
 </script>
 </body>
 </html>
