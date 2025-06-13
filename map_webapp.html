@@ -662,37 +662,30 @@
             ...data
         };
         
-        if (window.Telegram?.WebApp) {
-            Telegram.WebApp.sendData(JSON.stringify({
-                type: 'log_entry',
-                ...logEntry
-            }));
-        } else {
-            // В обычном браузере сохраняем в localStorage
-            const logs = JSON.parse(localStorage.getItem('webapp_logs') || '[]');
-            logs.push(logEntry);
-            localStorage.setItem('webapp_logs', JSON.stringify(logs));
-            
-            // Создаем кнопку для скачивания логов
-            const downloadBtn = document.getElementById('downloadLogsBtn') || 
-                document.createElement('button');
-            downloadBtn.id = 'downloadLogsBtn';
-            downloadBtn.textContent = 'Скачать логи';
-            downloadBtn.style.position = 'fixed';
-            downloadBtn.style.bottom = '20px';
-            downloadBtn.style.right = '20px';
-            downloadBtn.style.zIndex = '1000';
-            downloadBtn.onclick = () => {
-                const blob = new Blob([localStorage.getItem('webapp_logs')], 
-                    {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'webapp_logs.json';
-                a.click();
-            };
-            document.body.appendChild(downloadBtn);
-        }
+        // Всегда используем localStorage для логов
+        const logs = JSON.parse(localStorage.getItem('webapp_logs') || '[]');
+        logs.push(logEntry);
+        localStorage.setItem('webapp_logs', JSON.stringify(logs));
+        
+        // Создаем кнопку для скачивания логов
+        const downloadBtn = document.getElementById('downloadLogsBtn') || 
+            document.createElement('button');
+        downloadBtn.id = 'downloadLogsBtn';
+        downloadBtn.textContent = 'Скачать логи';
+        downloadBtn.style.position = 'fixed';
+        downloadBtn.style.bottom = '20px';
+        downloadBtn.style.right = '20px';
+        downloadBtn.style.zIndex = '1000';
+        downloadBtn.onclick = () => {
+            const blob = new Blob([localStorage.getItem('webapp_logs')], 
+                {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'webapp_logs.json';
+            a.click();
+        };
+        document.body.appendChild(downloadBtn);
     }
 </script>
 </body>
